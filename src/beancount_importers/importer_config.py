@@ -1,11 +1,18 @@
 import os
+from pathlib import Path
 
+import beangulp
 import yaml
-from uabean.importers import binance, ibkr, kraken, monobank
+
+try:
+    from uabean.importers import binance, ibkr, kraken, monobank
+except ModuleNotFoundError:
+    pass
 
 import beancount_importers.import_monzo as import_monzo
 import beancount_importers.import_revolut as import_revolut
 import beancount_importers.import_wise as import_wise
+from beancount_importers import import_emoney
 
 
 def get_importer_config(type, account, currency, importer_params):
@@ -80,6 +87,13 @@ def get_importer_config(type, account, currency, importer_params):
             module="beancount_import.source.generic_importer_source_beangulp",
             importer=binance.Importer(**(importer_params or {})),
             emoji="🎰"
+        )
+    elif type == "emoney":
+        return dict(
+            **common,
+            module="beancount_import.source.generic_importer_source_beangulp",
+            importer=import_emoney.get_importer(account, currency, importer_params),
+            emoji="💷"
         )
     else:
         return None
@@ -220,3 +234,18 @@ def get_import_config(data_dir, output_dir):
 
     import_config["all"] = import_config_all
     return import_config
+
+
+if __name__ == "__main__":
+    importers_config_file = Path('../../lazy-beancount/data/importers_config.yml')
+    data_dir = Path('/tmp')
+    output_dir = Path('/tmp/bean-out')
+    import_config = load_import_config_from_file(
+        importers_config_file, data_dir, output_dir
+    )
+    importers = import_config['all']['data_sources']
+    for importer_dict in importers:
+        importer = importer_dict['importer']
+        importer_params = {}
+        ingest = beangulp.Ingest([importer], [])
+        ingest()
